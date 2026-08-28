@@ -1,0 +1,12 @@
+{
+    "id": "{4793BE08-B3DB-7096-5459-0C3B65B0B25B}",
+    "name": "Test LogMessage",
+    "author": "Kai J. Oey",
+    "url": "",
+    "compatibility": {
+        "version": "7.1"
+    },
+    "version": "1.0",
+    "build": 1,
+    "date": 0
+}

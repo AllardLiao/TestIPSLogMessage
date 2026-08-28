@@ -1,0 +1,12 @@
+{
+    "id": "{459D91B4-9DF0-3B34-F23E-9DA967624067}",
+    "name": "Test Message Sink",
+    "type": 3,
+    "vendor": "",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "TSTLM",
+    "url": ""
+}

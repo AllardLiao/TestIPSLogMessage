@@ -1,0 +1,15 @@
+{
+    "elements": [
+        {
+            "type": "Label",
+            "caption": "Wähle eine Variable. Ändert sich ihr Wert, protokolliert das Modul ihn im MessageSink per $this->LogMessage()."
+        },
+        {
+            "type": "SelectVariable",
+            "name": "VariableID",
+            "caption": "Zu überwachende Variable"
+        }
+    ],
+    "actions": [],
+    "status": []
+}
