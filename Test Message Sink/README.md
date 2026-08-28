@@ -32,17 +32,20 @@ einzeln oder gemeinsam einschalten:
 | **Fall 2** | erst `IPS_SetProperty()` + `IPS_ApplyChanges()` auf die **eigene** Instanz, dann loggen | läuft sauber durch |
 | **Fall 3** | erst in die **überwachte Variable** zurückschreiben — löst eine verschachtelte Zustellung derselben Nachricht aus —, dann loggen | läuft sauber durch |
 | **Fall 2 + 3** | beides zusammen | läuft sauber durch |
-| **Fall 4** (Sekunden > 0) | den `MessageSink` künstlich verzögern, dann loggen | zu prüfen |
+| **Fall 4** (Sekunden > 0) | den `MessageSink` künstlich verzögern, dann loggen | läuft sauber durch |
 
-**Stand der Untersuchung:** Die Fälle 1 bis 3 wurden geprüft, einzeln und
-kombiniert — durchweg ohne Fehler. `$this->LogMessage()` funktioniert im
-`MessageSink` also grundsätzlich, auch bei Wiedereintritt in `ApplyChanges()`
-und auch bei verschachtelter Zustellung.
+**Stand der Untersuchung: nicht reproduzierbar.** Alle vier Fälle wurden
+geprüft, einzeln und kombiniert — durchweg ohne Fehler. `$this->LogMessage()`
+funktioniert im `MessageSink` also auch dann, wenn die Instanz sich darin selbst
+neu anwendet, wenn die Zustellung verschachtelt ist, und wenn der Durchlauf
+Sekunden dauert.
 
-Fall 4 zielt auf den letzten offensichtlichen Unterschied: das Modul, in dem der
-Fehler auftrat, ruft an dieser Stelle Übersetzungsanbieter über HTTP auf. Je
-nach Textmenge läuft der `MessageSink` dadurch Sekunden lang. Falls Symcon eine
-lang laufende Zustellung abräumt, wäre das die Erklärung.
+Damit ist die ursprüngliche Zuordnung fraglich. Die Warnung wurde am 17.08.2026
+in einem laufenden System beobachtet und dem Log-Aufruf zugeschrieben; ein
+isolierter Nachweis war es nicht. Möglich ist, dass sie von einem anderen Aufruf
+im selben Pfad stammte und nur zeitlich zusammenfiel.
+
+Dieses Repository dokumentiert damit vor allem, was der Auslöser **nicht** ist.
 
 ## Reproduktion
 
