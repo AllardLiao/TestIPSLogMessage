@@ -21,28 +21,28 @@ String-Variablen reagiert. Dort wurde als Umgehung eingebaut, im
 `MessageSink`-Kontext auf `IPS_LogMessage()` auszuweichen — mit dem Nachteil,
 dass die Meldung dann ohne Schweregrad-Farbcodierung als „Custom" erscheint.
 
-## Drei Fälle
+## Vier Fälle
 
-Zwei Schalter im Formular stellen den jeweiligen Unterschied her. Sie lassen
-sich einzeln oder gemeinsam einschalten:
+Die Schalter im Formular stellen den jeweiligen Unterschied her und lassen sich
+einzeln oder gemeinsam einschalten:
 
 | | Ablauf im `MessageSink()` | Ergebnis |
 |---|---|---|
-| **Fall 1** (beide aus) | nur `$this->LogMessage()` | läuft sauber durch |
-| **Fall 2** (Schalter 1) | erst `IPS_SetProperty()` + `IPS_ApplyChanges()` auf die **eigene** Instanz, dann loggen | läuft sauber durch |
-| **Fall 3** (Schalter 2) | erst in die **überwachte Variable** zurückschreiben — das löst eine verschachtelte Zustellung derselben Nachricht aus —, dann loggen | zu prüfen |
+| **Fall 1** (alles aus) | nur `$this->LogMessage()` | läuft sauber durch |
+| **Fall 2** | erst `IPS_SetProperty()` + `IPS_ApplyChanges()` auf die **eigene** Instanz, dann loggen | läuft sauber durch |
+| **Fall 3** | erst in die **überwachte Variable** zurückschreiben — löst eine verschachtelte Zustellung derselben Nachricht aus —, dann loggen | läuft sauber durch |
+| **Fall 2 + 3** | beides zusammen | läuft sauber durch |
+| **Fall 4** (Sekunden > 0) | den `MessageSink` künstlich verzögern, dann loggen | zu prüfen |
 
-Fall 1 und 2 wurden geprüft und sind unauffällig. Der Log-Eintrag erscheint wie
-erwartet, keine Warnung.
+**Stand der Untersuchung:** Die Fälle 1 bis 3 wurden geprüft, einzeln und
+kombiniert — durchweg ohne Fehler. `$this->LogMessage()` funktioniert im
+`MessageSink` also grundsätzlich, auch bei Wiedereintritt in `ApplyChanges()`
+und auch bei verschachtelter Zustellung.
 
-Das Modul, in dem der Fehler auftrat, vereint alle drei: sein `VM_UPDATE`-Pfad
-persistiert die aktualisierte Zeile per `IPS_SetProperty()` +
-`IPS_ApplyChanges()` **und** schreibt die übersetzte Fassung in genau die
-Variable zurück, die er überwacht. Der `MessageSink` läuft dadurch erneut an,
-während der erste Durchlauf noch offen ist.
-
-Eine Markierung im zurückgeschriebenen Wert beendet die Verschachtelung nach
-einer Runde — ohne sie liefe das endlos.
+Fall 4 zielt auf den letzten offensichtlichen Unterschied: das Modul, in dem der
+Fehler auftrat, ruft an dieser Stelle Übersetzungsanbieter über HTTP auf. Je
+nach Textmenge läuft der `MessageSink` dadurch Sekunden lang. Falls Symcon eine
+lang laufende Zustellung abräumt, wäre das die Erklärung.
 
 ## Reproduktion
 
@@ -50,10 +50,9 @@ einer Runde — ohne sie liefe das endlos.
 2. Im Konfigurationsformular eine beliebige **String-Variable** wählen,
    „Übernehmen".
 3. Den Wert dieser Variable ändern — etwa von Hand im Objektbaum.
-4. Meldungs-Log beobachten. → **Fall 1**, erwartungsgemäß ohne Fehler.
-5. Schalter 1 einschalten, „Übernehmen", Schritt 3 wiederholen. → **Fall 2**,
-   ebenfalls ohne Fehler.
-6. Schalter 2 einschalten, „Übernehmen", Schritt 3 wiederholen. → **Fall 3**.
+4. Meldungs-Log beobachten.
+5. Für die weiteren Fälle den jeweiligen Schalter setzen, „Übernehmen",
+   Schritt 3 wiederholen.
 
 Erwartet in allen Fällen: ein Eintrag `Wert von Variable <ID>: <Wert>`.
 

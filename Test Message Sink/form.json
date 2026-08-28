@@ -18,6 +18,13 @@
             "type": "CheckBox",
             "name": "WriteBackInMessageSink",
             "caption": "Fall 3: im MessageSink in die überwachte Variable zurückschreiben (erzeugt eine verschachtelte Zustellung)"
+        },
+        {
+            "type": "NumberSpinner",
+            "name": "DelaySeconds",
+            "caption": "Fall 4: MessageSink künstlich verzögern (Sekunden, 0 = aus)",
+            "minimum": 0,
+            "maximum": 120
         }
     ],
     "actions": [],

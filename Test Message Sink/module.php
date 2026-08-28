@@ -31,8 +31,12 @@ declare(strict_types=1);
  *                            MessageSink laeuft erneut an, waehrend der erste
  *                            Durchlauf noch offen ist.
  *
- * Faelle 1 und 2 laufen nachweislich fehlerfrei durch. Das Modul, in dem der
- * Fehler auftrat, vereint alle drei.
+ *   Fall 4 (Zahl > 0)     - den MessageSink kuenstlich verzoegern. Das Modul,
+ *                            in dem der Fehler auftrat, ruft hier
+ *                            Uebersetzungsanbieter ueber HTTP auf; das dauert
+ *                            je nach Textmenge Sekunden.
+ *
+ * Faelle 1 bis 3 laufen nachweislich fehlerfrei durch - auch kombiniert.
  *
  * REPRODUKTION:
  *   1. Instanz anlegen, im Formular eine beliebige Variable waehlen, uebernehmen.
@@ -51,6 +55,9 @@ class TestMessageSink extends IPSModuleStrict
     // Schalter fuer die beiden Zusatzfaelle - siehe MessageSink().
     private const PROPERTY_REAPPLY = 'ReapplyInMessageSink';
     private const PROPERTY_WRITE_BACK = 'WriteBackInMessageSink';
+
+    // Fall 4: kuenstliche Verzoegerung in Sekunden, 0 = aus.
+    private const PROPERTY_DELAY = 'DelaySeconds';
 
     // Markierung, damit das Zurueckschreiben nach EINER verschachtelten
     // Zustellung endet statt endlos weiterzulaufen.
@@ -73,6 +80,7 @@ class TestMessageSink extends IPSModuleStrict
         $this->RegisterPropertyInteger(self::PROPERTY_VARIABLE_ID, 0);
         $this->RegisterPropertyBoolean(self::PROPERTY_REAPPLY, false);
         $this->RegisterPropertyBoolean(self::PROPERTY_WRITE_BACK, false);
+        $this->RegisterPropertyInteger(self::PROPERTY_DELAY, 0);
         $this->RegisterPropertyInteger(self::PROPERTY_SCRATCH, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_REGISTERED_ID, 0);
     }
@@ -141,6 +149,16 @@ class TestMessageSink extends IPSModuleStrict
         if ($this->ReadPropertyBoolean(self::PROPERTY_WRITE_BACK)
             && !str_contains($value, self::WRITE_BACK_MARKER)) {
             SetValue($SenderID, $value . self::WRITE_BACK_MARKER);
+        }
+
+        // FALL 4 (Zahl im Formular, 0 = aus): den MessageSink kuenstlich in die
+        // Laenge ziehen. Das Modul, in dem der Fehler auftrat, ruft an dieser
+        // Stelle Uebersetzungsanbieter ueber HTTP auf - je nach Anbieter und
+        // Textmenge dauert das Sekunden. Falls Symcon eine lang laufende
+        // Zustellung abraeumt, waere das die Erklaerung.
+        $delay = $this->ReadPropertyInteger(self::PROPERTY_DELAY);
+        if ($delay > 0) {
+            sleep($delay);
         }
 
         // DAS ist der zu untersuchende Aufruf.
