@@ -19,10 +19,19 @@ declare(strict_types=1);
  * Konfigurationsformular waehlen, sie auf VM_UPDATE ueberwachen und im
  * MessageSink ihren Wert per $this->LogMessage() protokollieren.
  *
+ * ZWEI FAELLE ueber den Schalter im Formular:
+ *   Fall 1 (Schalter aus)  - nur protokollieren. Laeuft nachweislich
+ *                            fehlerfrei durch.
+ *   Fall 2 (Schalter an)   - vorher aus dem MessageSink heraus die eigene
+ *                            Instanz per IPS_SetProperty() + IPS_ApplyChanges()
+ *                            neu anwenden, DANN protokollieren. Genau das tut
+ *                            das Modul, in dem der Fehler auftrat.
+ *
  * REPRODUKTION:
  *   1. Instanz anlegen, im Formular eine beliebige Variable waehlen, uebernehmen.
  *   2. Den Wert dieser Variable aendern (z.B. von Hand im Objektbaum).
  *   3. Meldungs-Log beobachten.
+ *   4. Schalter einschalten, uebernehmen, Schritt 2 wiederholen.
  *
  * Das SendDebug() dient nur als Nachweis, dass der MessageSink ueberhaupt
  * erreicht wurde - es schreibt ins Debug-Fenster, nicht ins Log, und ist am
@@ -31,6 +40,14 @@ declare(strict_types=1);
 class TestMessageSink extends IPSModuleStrict
 {
     private const PROPERTY_VARIABLE_ID = 'VariableID';
+
+    // Schalter fuer den zweiten, entscheidenden Fall - siehe MessageSink().
+    private const PROPERTY_REAPPLY = 'ReapplyInMessageSink';
+
+    // Reine Ablage, damit IPS_SetProperty() etwas zu schreiben hat. Ihr Wert ist
+    // bedeutungslos; es geht nur darum, eine echte Property-Aenderung zu
+    // erzeugen, damit IPS_ApplyChanges() nicht als No-Op durchlaeuft.
+    private const PROPERTY_SCRATCH = 'Scratch';
 
     // Merkt sich, welche Variable aktuell ueberwacht wird, damit ein Wechsel im
     // Formular keine verwaiste Registrierung hinterlaesst.
@@ -42,6 +59,8 @@ class TestMessageSink extends IPSModuleStrict
         parent::Create();
 
         $this->RegisterPropertyInteger(self::PROPERTY_VARIABLE_ID, 0);
+        $this->RegisterPropertyBoolean(self::PROPERTY_REAPPLY, false);
+        $this->RegisterPropertyInteger(self::PROPERTY_SCRATCH, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_REGISTERED_ID, 0);
     }
 
@@ -80,6 +99,21 @@ class TestMessageSink extends IPSModuleStrict
 
         // Nachweis, dass der MessageSink erreicht wurde (Debug-Fenster, nicht Log).
         $this->SendDebug('MessageSink', 'VM_UPDATE von Variable ' . $SenderID, 0);
+
+        // FALL 2 (Schalter im Formular): die Instanz schreibt eine eigene
+        // Property und wendet sich selbst neu an - sie laeuft also aus dem
+        // MessageSink heraus erneut durch ApplyChanges(). Genau das tut das
+        // Modul, in dem der Fehler auftrat: sein VM_UPDATE-Pfad persistiert die
+        // aktualisierte Zeile per IPS_SetProperty() + IPS_ApplyChanges().
+        //
+        // FALL 1 (Schalter aus) ist der einfache Ablauf ohne diesen
+        // Wiedereintritt. Er laeuft nachweislich fehlerfrei durch - deshalb
+        // steht der Verdacht, dass erst der Wiedereintritt die
+        // Instanz-Schnittstelle unbrauchbar macht.
+        if ($this->ReadPropertyBoolean(self::PROPERTY_REAPPLY)) {
+            IPS_SetProperty($this->InstanceID, self::PROPERTY_SCRATCH, time());
+            IPS_ApplyChanges($this->InstanceID);
+        }
 
         // DAS ist der zu untersuchende Aufruf.
         $this->LogMessage(

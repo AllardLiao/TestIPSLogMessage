@@ -8,6 +8,11 @@
             "type": "SelectVariable",
             "name": "VariableID",
             "caption": "Zu überwachende Variable"
+        },
+        {
+            "type": "CheckBox",
+            "name": "ReapplyInMessageSink",
+            "caption": "Fall 2: im MessageSink zuerst die eigene Instanz neu anwenden (IPS_SetProperty + IPS_ApplyChanges), dann loggen"
         }
     ],
     "actions": [],
