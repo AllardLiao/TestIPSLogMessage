@@ -22,10 +22,17 @@ declare(strict_types=1);
  * ZWEI FAELLE ueber den Schalter im Formular:
  *   Fall 1 (Schalter aus)  - nur protokollieren. Laeuft nachweislich
  *                            fehlerfrei durch.
- *   Fall 2 (Schalter an)   - vorher aus dem MessageSink heraus die eigene
+ *   Fall 2 (Schalter 1 an) - vorher aus dem MessageSink heraus die eigene
  *                            Instanz per IPS_SetProperty() + IPS_ApplyChanges()
- *                            neu anwenden, DANN protokollieren. Genau das tut
- *                            das Modul, in dem der Fehler auftrat.
+ *                            neu anwenden, DANN protokollieren.
+ *   Fall 3 (Schalter 2 an) - vorher in die UEBERWACHTE Variable
+ *                            zurueckschreiben. Das loest eine verschachtelte
+ *                            Zustellung derselben Nachricht aus - dieser
+ *                            MessageSink laeuft erneut an, waehrend der erste
+ *                            Durchlauf noch offen ist.
+ *
+ * Faelle 1 und 2 laufen nachweislich fehlerfrei durch. Das Modul, in dem der
+ * Fehler auftrat, vereint alle drei.
  *
  * REPRODUKTION:
  *   1. Instanz anlegen, im Formular eine beliebige Variable waehlen, uebernehmen.
@@ -41,8 +48,13 @@ class TestMessageSink extends IPSModuleStrict
 {
     private const PROPERTY_VARIABLE_ID = 'VariableID';
 
-    // Schalter fuer den zweiten, entscheidenden Fall - siehe MessageSink().
+    // Schalter fuer die beiden Zusatzfaelle - siehe MessageSink().
     private const PROPERTY_REAPPLY = 'ReapplyInMessageSink';
+    private const PROPERTY_WRITE_BACK = 'WriteBackInMessageSink';
+
+    // Markierung, damit das Zurueckschreiben nach EINER verschachtelten
+    // Zustellung endet statt endlos weiterzulaufen.
+    private const WRITE_BACK_MARKER = ' [zurueckgeschrieben]';
 
     // Reine Ablage, damit IPS_SetProperty() etwas zu schreiben hat. Ihr Wert ist
     // bedeutungslos; es geht nur darum, eine echte Property-Aenderung zu
@@ -60,6 +72,7 @@ class TestMessageSink extends IPSModuleStrict
 
         $this->RegisterPropertyInteger(self::PROPERTY_VARIABLE_ID, 0);
         $this->RegisterPropertyBoolean(self::PROPERTY_REAPPLY, false);
+        $this->RegisterPropertyBoolean(self::PROPERTY_WRITE_BACK, false);
         $this->RegisterPropertyInteger(self::PROPERTY_SCRATCH, 0);
         $this->RegisterAttributeInteger(self::ATTRIBUTE_REGISTERED_ID, 0);
     }
@@ -113,6 +126,21 @@ class TestMessageSink extends IPSModuleStrict
         if ($this->ReadPropertyBoolean(self::PROPERTY_REAPPLY)) {
             IPS_SetProperty($this->InstanceID, self::PROPERTY_SCRATCH, time());
             IPS_ApplyChanges($this->InstanceID);
+        }
+
+        // FALL 3 (Schalter im Formular): in die UEBERWACHTE Variable
+        // zurueckschreiben. Das loest eine VERSCHACHTELTE Zustellung derselben
+        // Nachricht aus - dieser MessageSink laeuft also erneut an, waehrend der
+        // erste Durchlauf noch offen ist. Genau das tut das Modul, in dem der
+        // Fehler auftrat: es schreibt die uebersetzte Fassung in die Variable
+        // zurueck, die es ueberwacht.
+        //
+        // Die Markierung beendet die Verschachtelung nach EINER Runde. Ohne sie
+        // liefe das endlos.
+        $value = (string) GetValue($SenderID);
+        if ($this->ReadPropertyBoolean(self::PROPERTY_WRITE_BACK)
+            && !str_contains($value, self::WRITE_BACK_MARKER)) {
+            SetValue($SenderID, $value . self::WRITE_BACK_MARKER);
         }
 
         // DAS ist der zu untersuchende Aufruf.

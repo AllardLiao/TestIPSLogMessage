@@ -13,6 +13,11 @@
             "type": "CheckBox",
             "name": "ReapplyInMessageSink",
             "caption": "Fall 2: im MessageSink zuerst die eigene Instanz neu anwenden (IPS_SetProperty + IPS_ApplyChanges), dann loggen"
+        },
+        {
+            "type": "CheckBox",
+            "name": "WriteBackInMessageSink",
+            "caption": "Fall 3: im MessageSink in die überwachte Variable zurückschreiben (erzeugt eine verschachtelte Zustellung)"
         }
     ],
     "actions": [],

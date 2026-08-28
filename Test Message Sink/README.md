@@ -21,32 +21,41 @@ String-Variablen reagiert. Dort wurde als Umgehung eingebaut, im
 `MessageSink`-Kontext auf `IPS_LogMessage()` auszuweichen — mit dem Nachteil,
 dass die Meldung dann ohne Schweregrad-Farbcodierung als „Custom" erscheint.
 
-## Zwei Fälle
+## Drei Fälle
 
-Das Formular hat einen Schalter, der den einzigen Unterschied zwischen beiden
-Abläufen herstellt:
+Zwei Schalter im Formular stellen den jeweiligen Unterschied her. Sie lassen
+sich einzeln oder gemeinsam einschalten:
 
 | | Ablauf im `MessageSink()` | Ergebnis |
 |---|---|---|
-| **Fall 1** (Schalter aus) | nur `$this->LogMessage()` | läuft sauber durch |
-| **Fall 2** (Schalter an) | erst `IPS_SetProperty()` + `IPS_ApplyChanges()` auf die **eigene** Instanz, dann `$this->LogMessage()` | zu prüfen |
+| **Fall 1** (beide aus) | nur `$this->LogMessage()` | läuft sauber durch |
+| **Fall 2** (Schalter 1) | erst `IPS_SetProperty()` + `IPS_ApplyChanges()` auf die **eigene** Instanz, dann loggen | läuft sauber durch |
+| **Fall 3** (Schalter 2) | erst in die **überwachte Variable** zurückschreiben — das löst eine verschachtelte Zustellung derselben Nachricht aus —, dann loggen | zu prüfen |
 
-Fall 1 wurde geprüft und ist unauffällig — der Log-Eintrag erscheint wie
-erwartet. Das Modul, in dem der Fehler auftrat, entspricht Fall 2: sein
-`VM_UPDATE`-Pfad persistiert die aktualisierte Zeile per `IPS_SetProperty()` +
-`IPS_ApplyChanges()` und läuft damit aus dem `MessageSink` heraus erneut durch
-`ApplyChanges()`. Der Verdacht ist, dass erst dieser Wiedereintritt die
-Instanz-Schnittstelle unbrauchbar macht.
+Fall 1 und 2 wurden geprüft und sind unauffällig. Der Log-Eintrag erscheint wie
+erwartet, keine Warnung.
+
+Das Modul, in dem der Fehler auftrat, vereint alle drei: sein `VM_UPDATE`-Pfad
+persistiert die aktualisierte Zeile per `IPS_SetProperty()` +
+`IPS_ApplyChanges()` **und** schreibt die übersetzte Fassung in genau die
+Variable zurück, die er überwacht. Der `MessageSink` läuft dadurch erneut an,
+während der erste Durchlauf noch offen ist.
+
+Eine Markierung im zurückgeschriebenen Wert beendet die Verschachtelung nach
+einer Runde — ohne sie liefe das endlos.
 
 ## Reproduktion
 
 1. Instanz dieses Moduls anlegen.
-2. Im Konfigurationsformular eine beliebige Variable wählen, „Übernehmen".
+2. Im Konfigurationsformular eine beliebige **String-Variable** wählen,
+   „Übernehmen".
 3. Den Wert dieser Variable ändern — etwa von Hand im Objektbaum.
 4. Meldungs-Log beobachten. → **Fall 1**, erwartungsgemäß ohne Fehler.
-5. Schalter einschalten, „Übernehmen", Schritt 3 wiederholen. → **Fall 2**.
+5. Schalter 1 einschalten, „Übernehmen", Schritt 3 wiederholen. → **Fall 2**,
+   ebenfalls ohne Fehler.
+6. Schalter 2 einschalten, „Übernehmen", Schritt 3 wiederholen. → **Fall 3**.
 
-Erwartet in beiden Fällen: ein Eintrag `Wert von Variable <ID>: <Wert>`.
+Erwartet in allen Fällen: ein Eintrag `Wert von Variable <ID>: <Wert>`.
 
 ## Aufbau
 
